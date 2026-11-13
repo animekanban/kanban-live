@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>kanban-musume-assembled-v10</title>
+<title>kanban-musume-assembled-v11</title>
 <style>
   html, body { margin: 0; height: 100%; background: #2b2118 url("school-bg.jpg") center 38% / cover no-repeat fixed; font: 14px system-ui, sans-serif; color: #222; }
   main { display: flex; flex-direction: column; height: 100%; position: relative; }
@@ -33,7 +33,7 @@ import { P2LPlayer } from "./p2l.js";
 
 const canvas = document.getElementById("stage");
 try {
-  const player = await P2LPlayer.create(canvas, "p2l_runtime.wasm", "kanban-musume-assembled-v10.p2lrt");
+  const player = await P2LPlayer.create(canvas, "p2l_runtime.wasm", "kanban-musume-assembled-v11.p2lrt");
   const select = document.getElementById("clip");
   for (const id of player.clips) select.add(new Option(id, id));
   select.onchange = () => player.play(select.value || null);
