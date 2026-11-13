@@ -6,15 +6,18 @@
 <title>kanban-musume-assembled-v10</title>
 <style>
   html, body { margin: 0; height: 100%; background: #2b2118 url("school-bg.jpg") center 38% / cover no-repeat fixed; font: 14px system-ui, sans-serif; color: #222; }
-  main { display: flex; flex-direction: column; height: 100%; }
+  main { display: flex; flex-direction: column; height: 100%; position: relative; }
+  #ground-shadow { position: absolute; z-index: 0; pointer-events: none; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(38,22,6,.66) 0%, rgba(38,22,6,.40) 52%, rgba(38,22,6,0) 74%); left: 41.5%; top: 94.2%; width: 20%; height: 4.4%; transform: translate(-50%, -50%); }
+  canvas { position: relative; z-index: 1; }
   canvas { flex: 1; width: 100%; min-height: 0; touch-action: none; margin-top: 9vh; }
-  @media (orientation: portrait) { html, body { background-image: url("school-bg-portrait.jpg"); background-position: center 30%; } }
+  @media (orientation: portrait) { html, body { background-image: url("school-bg-portrait.jpg"); background-position: center 30%; } #ground-shadow { left: 54%; top: 77.6%; width: 52%; height: 3.4%; } }
   nav { display: flex; gap: 12px; align-items: center; padding: 8px 12px; flex-wrap: wrap; background: rgba(255,251,243,.82); backdrop-filter: blur(6px); }
   #error { color: #b00020; }
 </style>
 </head>
 <body>
 <main>
+  <div id="ground-shadow"></div>
   <canvas id="stage"></canvas>
   <nav>
     <label>Clip <select id="clip"><option value="">(none)</option></select></label>
