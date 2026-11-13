@@ -11,8 +11,16 @@
   canvas { position: relative; z-index: 1; }
   canvas { flex: 1; width: 100%; min-height: 0; touch-action: none; margin-top: 9vh; }
   @media (orientation: portrait) { html, body { background-image: url("school-bg-portrait.jpg"); background-position: center 30%; } #ground-shadow { left: 54%; top: 77.6%; width: 52%; height: 3.4%; } }
-  nav { display: flex; gap: 12px; align-items: center; padding: 8px 12px; flex-wrap: wrap; background: rgba(255,251,243,.82); backdrop-filter: blur(6px); }
-  #error { color: #b00020; }
+  nav { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: rgba(255,251,243,.88); backdrop-filter: blur(6px); }
+  .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .glabel { font-size: 12px; color: #6b5844; min-width: 2.4em; letter-spacing: .08em; }
+  .chip { appearance: none; border: 1px solid #d8c3a5; background: #fff8ec; color: #4a3826; border-radius: 999px; padding: 7px 14px; font-size: 13.5px; line-height: 1.15; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .chip:active { transform: scale(.96); }
+  .chip.on { background: #b03030; border-color: #b03030; color: #fff; }
+  .chip:disabled { opacity: .55; }
+  #mouth { flex: 1; min-width: 90px; accent-color: #b03030; }
+  #advanced-label { font-size: 12px; color: #6b5844; }
+  #error { color: #b00020; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -20,33 +28,81 @@
   <div id="ground-shadow"></div>
   <canvas id="stage"></canvas>
   <nav>
-    <label>Clip <select id="clip"><option value="">(none)</option></select></label>
-    <label>Expression <select id="expression"><option value="">(none)</option></select></label>
-    <label>Mouth <input id="mouth" type="range" min="0" max="1" step="0.01" value="0"></label>
-    <label id="advanced-label" hidden><input id="advanced" type="checkbox"> Advanced (live skin and cloth)</label>
-    <span id="hit"></span>
-    <span id="error"></span>
+    <div class="row"><span class="glabel">动作</span><span id="clips" class="row" style="gap:6px"></span></div>
+    <div class="row"><span class="glabel">表情</span><span id="exprs" class="row" style="gap:6px"></span></div>
+    <div class="row"><span class="glabel">嘴巴</span><input id="mouth" type="range" min="0" max="1" step="0.01" value="0"><button id="talk" class="chip" type="button">说话</button>
+      <label id="advanced-label" hidden><input id="advanced" type="checkbox"> Advanced</label>
+      <span id="error"></span></div>
   </nav>
 </main>
 <script type="module">
 import { P2LPlayer } from "./p2l.js";
 
+const CLIP_LABELS = { Idle: "待机", Blink: "眨眼", Nod: "点头", Shake: "摇头" };
+const EXPR_LABELS = { smile: "微笑", sad: "委屈", angry: "生气", surprised: "惊讶" };
+const ONESHOT = new Set(["Blink", "Nod", "Shake"]);
+
 const canvas = document.getElementById("stage");
 try {
   const player = await P2LPlayer.create(canvas, "p2l_runtime.wasm", "kanban-musume-assembled-v12.p2lrt");
-  const select = document.getElementById("clip");
-  for (const id of player.clips) select.add(new Option(id, id));
-  select.onchange = () => player.play(select.value || null);
-  const expression = document.getElementById("expression");
-  for (const id of player.expressions) expression.add(new Option(id, id));
-  expression.onchange = () => player.expression(expression.value || null);
+
+  // Motion buttons: Idle is the persistent base loop; the rest are one-shot triggers.
+  const clipsBox = document.getElementById("clips");
+  const clipBtns = new Map();
+  let baseClip = player.clips.includes("Idle") ? "Idle" : null;
+  const markClip = () => { for (const [id, b] of clipBtns) b.classList.toggle("on", id === baseClip); };
+  for (const id of player.clips) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = CLIP_LABELS[id] || id;
+    b.onclick = () => {
+      if (ONESHOT.has(id)) {
+        player.play(id);
+        b.classList.add("on"); setTimeout(markClip, 450);
+      } else {
+        baseClip = id; player.play(id); markClip();
+      }
+    };
+    clipsBox.appendChild(b); clipBtns.set(id, b);
+  }
+  if (baseClip) { player.play(baseClip); markClip(); }
+
+  // Expression buttons: a toggle group with an explicit "normal" reset.
+  const exprsBox = document.getElementById("exprs");
+  const exprBtns = new Map();
+  let curExpr = null;
+  const markExpr = () => { for (const [id, b] of exprBtns) b.classList.toggle("on", id === curExpr); };
+  const noneBtn = document.createElement("button");
+  noneBtn.type = "button"; noneBtn.className = "chip on"; noneBtn.textContent = "平常";
+  noneBtn.onclick = () => { curExpr = null; player.expression(null); markExpr(); };
+  exprsBox.appendChild(noneBtn); exprBtns.set(null, noneBtn);
+  for (const id of player.expressions) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = EXPR_LABELS[id] || id;
+    b.onclick = () => { curExpr = id; player.expression(id); markExpr(); };
+    exprsBox.appendChild(b); exprBtns.set(id, b);
+  }
+
+  // Mouth: slider drives lip sync directly; "talk" flaps it for a couple of seconds.
+  const mouth = document.getElementById("mouth");
+  mouth.oninput = (e) => player.lipSync(Number(e.target.value));
+  const talkBtn = document.getElementById("talk");
+  talkBtn.onclick = () => {
+    talkBtn.disabled = true;
+    const t0 = performance.now();
+    const iv = setInterval(() => {
+      const t = performance.now() - t0;
+      if (t > 2200) {
+        clearInterval(iv); player.lipSync(0); mouth.value = 0; talkBtn.disabled = false; return;
+      }
+      const v = (Math.sin(t / 95) > -0.2) ? 0.45 + Math.random() * 0.5 : 0.05;
+      player.lipSync(v); mouth.value = v;
+    }, 90);
+  };
+
   if (player.advancedFeatures) {
     document.getElementById("advanced-label").hidden = false;
     document.getElementById("advanced").onchange = (e) => player.setAdvanced(e.target.checked ? player.advancedFeatures : 0);
   }
-  // A tap names the hit area under it.
-  canvas.onpointerdown = (e) => { document.getElementById("hit").textContent = player.hitTest(e.clientX, e.clientY) ?? ""; };
-  document.getElementById("mouth").oninput = (e) => player.lipSync(Number(e.target.value));
   // Gaze follows the pointer over the canvas.
   canvas.onpointermove = (e) => {
     const r = canvas.getBoundingClientRect();
